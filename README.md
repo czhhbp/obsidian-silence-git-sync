@@ -1,6 +1,6 @@
 # Silence Git Sync
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/czhhbp/obsidian-silence-git-sync/releases)
+[![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](https://github.com/czhhbp/obsidian-silence-git-sync/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Sync your vault to a Git remote silently in the background. Edit your notes and forget about it — the plugin commits, merges, and pushes on its own. No popups, no interruptions; you only hear from it when something goes wrong.

@@ -1,0 +1,1 @@
+# obsidian-silence-git-sync

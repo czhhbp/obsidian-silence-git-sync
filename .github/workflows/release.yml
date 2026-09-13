@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建插件（类型检查 + 打包）
+        run: npm run build
+
+      - name: 校验产物完整性
+        run: |
+          set -e
+          for file in main.js manifest.json styles.css; do
+            if [ ! -f "$file" ]; then
+              echo "::error::缺少构建产物：$file"
+              exit 1
+            fi
+            echo "✓ $file ($(wc -c < "$file") bytes)"
+          done
+          node --check main.js
+          echo "✓ main.js 语法检查通过"
+
+      - name: 校验版本号一致性
+        run: |
+          set -e
+          MANIFEST_VERSION=$(node -p "require('./manifest.json').version")
+
+          # 标签推送时，标签名必须与 manifest.json 的版本号一致
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+              echo "::error::标签版本 ($TAG_VERSION) 与 manifest.json 版本 ($MANIFEST_VERSION) 不一致"
+              exit 1
+            fi
+            echo "✓ 标签与 manifest 版本一致：$MANIFEST_VERSION"
+          fi
+
+          # versions.json 必须包含该版本的 minAppVersion 映射
+          node -e "
+            const versions = require('./versions.json');
+            const manifest = require('./manifest.json');
+            const v = manifest.version;
+            if (!versions[v]) {
+              console.error('::error::versions.json 缺少版本映射：' + v);
+              process.exit(1);
+            }
+            if (versions[v] !== manifest.minAppVersion) {
+              console.error('::error::versions.json 中的 minAppVersion 与 manifest 不一致');
+              process.exit(1);
+            }
+            console.log('✓ versions.json 映射正确：' + v + ' -> ' + versions[v]);
+          "
+
+      - name: 打包插件压缩包
+        run: |
+          mkdir -p dist/silence-git-sync
+          cp main.js manifest.json styles.css dist/silence-git-sync/
+          cd dist && zip -r ../silence-git-sync.zip silence-git-sync
+
+      - name: 生成 Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Silence Git Sync ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            main.js
+            manifest.json
+            styles.css
+            silence-git-sync.zip
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

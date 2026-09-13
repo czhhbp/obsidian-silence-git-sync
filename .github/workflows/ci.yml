@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ["18.x", "20.x"]
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建插件（含类型检查）
+        run: npm run build
+
+      - name: 校验构建产物
+        run: |
+          set -e
+          for file in main.js manifest.json styles.css; do
+            [ -f "$file" ] || { echo "::error::缺少构建产物：$file"; exit 1; }
+          done
+          node --check main.js
+          echo "✓ 构建产物校验通过"
+
+      - name: 上传构建产物
+        if: matrix.node-version == '20.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-build
+          path: |
+            main.js
+            manifest.json
+            styles.css
+          retention-days: 7

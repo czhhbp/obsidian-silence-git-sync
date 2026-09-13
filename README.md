@@ -106,6 +106,28 @@ npm run build
 npm version patch   # 或 minor / major，会自动更新 manifest.json 与 versions.json
 ```
 
+### 自动发版流程
+
+仓库已配置 GitHub Actions，推送 tag 即自动构建并发布 Release，无需手动打包：
+
+```bash
+npm version patch        # 1. 更新版本号（自动同步 manifest.json / versions.json）
+git push origin main     # 2. 推送提交
+git push origin --tags   # 3. 推送 tag → 触发自动构建与发布
+```
+
+推送 tag 后，工作流会依次执行：安装依赖 → 类型检查与打包 → 校验产物完整性
+→ 比对 tag 与 `manifest.json` 版本号是否一致 → 创建 Release 并上传
+`main.js`、`manifest.json`、`styles.css` 及打包好的 `silence-git-sync.zip`。
+
+> 若 tag 名（去掉可选的 `v` 前缀）与 `manifest.json` 中的 `version` 不一致，
+> 工作流会主动失败，避免发布出错版本的产物。
+
+| 工作流 | 触发条件 | 作用 |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | push / PR 到 `main` | 在 Node 18 与 20 下验证构建，上传产物 |
+| `.github/workflows/release.yml` | 推送任意 tag | 构建校验通过后自动创建 Release |
+
 ### 项目结构
 
 ```
@@ -122,6 +144,8 @@ silence-git-sync/
 ├── styles.css           # 状态栏与设置面板样式
 └── versions.json        # 版本与最低 Obsidian 版本映射
 ```
+
+仓库顶层的 `.github/workflows/` 存放自动构建与发布的工作流定义。
 
 ## 许可证
 

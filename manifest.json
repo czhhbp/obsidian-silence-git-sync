@@ -3,7 +3,7 @@
 	"name": "Silence Git Sync",
 	"version": "1.0.1",
 	"minAppVersion": "1.5.0",
-	"description": "静默后台同步 Obsidian 笔记库到 Git 远程仓库：定时提交推送、自动合并、冲突零丢失。Silently commit, merge and push your vault to a Git remote in the background.",
+	"description": "Sync your vault to a Git remote silently in the background on a schedule, with zero-loss conflict handling.",
 	"author": "czhhbp",
 	"authorUrl": "https://github.com/czhhbp",
 	"isDesktopOnly": true

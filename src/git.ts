@@ -2,25 +2,24 @@ import { execFile } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { Platform } from "obsidian";
 import { GIT_MISSING_MESSAGE, MOBILE_MESSAGE } from "./constants";
 
 /** 便于上层区分错误类别，避免把配置问题当成普通同步失败。 */
 export interface SyncError extends Error {
-	stdout?: any;
-	stderr?: any;
+	stdout?: string;
+	stderr?: string;
 	gitMissing?: boolean;
 	platformUnsupported?: boolean;
 }
 
 /**
- * 桌面端才有 Node.js 运行时；移动端为 Capacitor 容器，require 直接抛错会导致插件加载失败，
+ * 桌面端才有 Node.js 运行时；移动端为 Capacitor 容器，直接访问 Node 能力会导致插件加载失败，
  * 因此这里统一做探测，并把 Node 模块以可空形式暴露给上层。
  */
 export const isDesktopApp = (): boolean => {
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const { Platform } = require("obsidian");
-		return Platform?.isDesktopApp === true;
+		return Platform.isDesktopApp === true;
 	} catch {
 		return false;
 	}
@@ -57,13 +56,12 @@ export function platformError(): SyncError | null {
 }
 
 export interface RunGitOptions {
-	encoding?: BufferEncoding | "buffer";
 	env?: NodeJS.ProcessEnv;
 }
 
 export interface RunGitResult {
-	stdout: any;
-	stderr: any;
+	stdout: string;
+	stderr: string;
 }
 
 /** 统一封装 git 调用：固定 windowsHide、放大缓冲、识别“未安装 Git”。 */
@@ -85,10 +83,12 @@ export function runGit(
 				cwd,
 				windowsHide: true,
 				maxBuffer: 20 * 1024 * 1024,
-				encoding: (options.encoding as BufferEncoding) || "utf8",
+				encoding: "utf8",
 				env: options.env || process.env,
 			},
 			(error, stdout, stderr) => {
+				const out = stdout;
+				const errOut = stderr;
 				if (error) {
 					const gitError = error as SyncError;
 					if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -98,12 +98,55 @@ export function runGit(
 						reject(missing);
 						return;
 					}
-					gitError.stdout = stdout;
-					gitError.stderr = stderr;
+					gitError.stdout = out;
+					gitError.stderr = errOut;
 					reject(gitError);
 					return;
 				}
-				resolve({ stdout, stderr });
+				resolve({ stdout: out, stderr: errOut });
+			}
+		);
+	});
+}
+
+/**
+ * 冲突解决需要读取远程对象的原始字节，这里单独封装一个始终返回 Buffer 的调用。
+ */
+export function runGitBuffer(
+	cwd: string,
+	args: string[],
+	env?: NodeJS.ProcessEnv
+): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const unavailable = platformError();
+		if (unavailable) {
+			reject(unavailable);
+			return;
+		}
+		execFileFn!(
+			"git",
+			args,
+			{
+				cwd,
+				windowsHide: true,
+				maxBuffer: 20 * 1024 * 1024,
+				encoding: "buffer",
+				env: env || process.env,
+			},
+			(error, stdout) => {
+				if (error) {
+					const gitError = error as SyncError;
+					if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+						const missing = new Error(GIT_MISSING_MESSAGE) as SyncError;
+						missing.stderr = GIT_MISSING_MESSAGE;
+						missing.gitMissing = true;
+						reject(missing);
+						return;
+					}
+					reject(gitError);
+					return;
+				}
+				resolve(stdout);
 			}
 		);
 	});
@@ -117,7 +160,7 @@ export function formatTime(date: Date): string {
 	});
 }
 
-/** 冲突时远程版本落盘为同名兄弟文件，例如笔记.md -> 笔记.sync-remote.md */
+/** 冲突时远程版本落盘为同名兄弟文件，例如 note.md -> note.sync-remote.md */
 export function conflictCopyPath(filePath: string): string {
 	const extension = path.extname(filePath);
 	return extension

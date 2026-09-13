@@ -10,3 +10,14 @@ Thumbs.db
 
 # æœ¬åœ°æµ‹è¯•ç”¨çš„åº“æ•°æ®
 data.json
+
+# Lint/Õï¶ÏÁÙÊ±ÎÄ¼ş
+lint-out.json
+lint-stat.txt
+rem.txt
+base.txt
+perr.txt
+dump-obs.mjs
+
+dump-obs.txt
+

@@ -1,4 +1,9 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import {
+	App,
+	PluginSettingTab,
+	Setting,
+	type SettingDefinitionItem,
+} from "obsidian";
 import { MOBILE_MESSAGE } from "./constants";
 import type SilenceGitSync from "../main";
 import type { SilenceGitSyncSettings } from "./settings";
@@ -11,32 +16,74 @@ export class SilenceGitSyncSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/** 声明式设置定义，使设置项可被 Obsidian 设置搜索（1.13.0+）检索。 */
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		if (!this.plugin.supported) return [];
+		return [
+			{
+				name: "Sync now",
+				desc: "Run an immediate commit, merge and push.",
+				action: () => {
+					void this.plugin.sync("Manual sync", true);
+				},
+			},
+			{
+				name: "Remote HTTPS URL (optional)",
+				desc: "Remote repository to sync to. Leave empty to use the origin of the existing repository in this vault.",
+				aliases: ["git remote", "origin", "repository", "url"],
+				control: { type: "text", key: "remoteUrl", placeholder: "Leave empty to use the vault's existing Git remote" },
+			},
+			{
+				name: "Access token (optional)",
+				desc: "Fill this when the remote requires authentication. GitHub and GitLab use a personal access token. Leave empty to fall back to the system credential manager. The token is only used for the HTTP header of the current sync and is never written to the repository config.",
+				aliases: ["token", "pat", "password", "credential"],
+				control: { type: "text", key: "token", placeholder: "ghp_xxx or glpat-xxx" },
+			},
+			{
+				name: "Custom .gitignore rules",
+				desc: "One path per line, no trailing punctuation. Leave empty to ignore all dot-prefixed files and folders by default. The content is written inside a marked block in the vault's root .gitignore and takes effect on the next sync.",
+				aliases: ["ignore", "exclude"],
+				control: { type: "textarea", key: "ignoredPaths", placeholder: "For example:\n.cache/\nattachments/", rows: 6 },
+			},
+			{
+				name: "Sync delay after edit (minutes)",
+				desc: "Automatically sync once after you stop editing for this long.",
+				aliases: ["debounce", "delay"],
+				control: { type: "text", key: "editDelayMinutes", placeholder: "1" },
+			},
+			{
+				name: "Scheduled sync interval (minutes)",
+				desc: "Automatically commit and push once every this many minutes.",
+				aliases: ["interval", "schedule", "periodic"],
+				control: { type: "text", key: "syncIntervalMinutes", placeholder: "10" },
+			},
+		];
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		const settings: SilenceGitSyncSettings = this.plugin.settings;
 		containerEl.empty();
-		containerEl.createEl("h2", { text: "Silence Git Sync" });
 
 		if (!this.plugin.supported) {
-			containerEl.createEl("p", { text: MOBILE_MESSAGE });
-			containerEl.createEl("p", {
-				text: "在移动端启用本插件不会造成任何修改，你可以在电脑端正常使用同步功能。",
-			});
+			new Setting(containerEl).setDesc(MOBILE_MESSAGE);
+			new Setting(containerEl).setDesc(
+				"Enabling this plugin on mobile makes no changes; you can use the sync features on desktop."
+			);
 			return;
 		}
 
-		containerEl.createEl("p", {
-			text: "使用系统 Git 在后台静默提交、合并并推送当前笔记库。",
-		});
+		new Setting(containerEl).setDesc(
+			"Silently commit, merge and push the current vault in the background using the system Git."
+		);
 
 		new Setting(containerEl)
-			.setName("仓库 HTTPS 地址（可选）")
+			.setName("Remote HTTPS URL (optional)")
 			.setDesc(
-				"要同步到的远程仓库地址，例如：https://github.com/user/repo.git。留空时使用当前笔记库已存在的 Git 仓库及其 origin 远程。"
-			)
-			.addText((text) =>
+				"Remote repository to sync to. Leave empty to use the origin of the existing repository in this vault."
+			)			.addText((text) =>
 				text
-					.setPlaceholder("留空则使用笔记库已有的 Git 仓库")
+					.setPlaceholder("Leave empty to use the vault's existing Git remote")
 					.setValue(settings.remoteUrl)
 					.onChange(async (value) => {
 						settings.remoteUrl = value.trim();
@@ -45,14 +92,14 @@ export class SilenceGitSyncSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("访问令牌（可选）")
+			.setName("Access token (optional)")
 			.setDesc(
-				"仓库需要身份验证时填写。GitHub/GitLab 使用 Personal Access Token（需 repo / write_repository 权限）；留空则回退到系统 Git 凭据管理器。令牌只用于本次同步的 HTTP 头，不会写入 .git/config。"
+				"Fill this when the remote requires authentication. GitHub and GitLab use a personal access token. Leave empty to fall back to the system credential manager. The token is only used for the HTTP header of the current sync and is never written to the repository config."
 			)
 			.addText((text) => {
 				text.inputEl.type = "password";
 				text
-					.setPlaceholder("ghp_xxx 或 glpat-xxx")
+					.setPlaceholder("Ghp_xxx or glpat-xxx")
 					.setValue(settings.token)
 					.onChange(async (value) => {
 						settings.token = value.trim();
@@ -61,13 +108,13 @@ export class SilenceGitSyncSettingTab extends PluginSettingTab {
 			});
 
 		const ignoreSetting = new Setting(containerEl)
-			.setName(".gitignore")
+			.setName("Custom .gitignore rules")
 			.setDesc(
-				"一行一个路径，不需要末尾标点。留空时默认忽略所有点号开头的文件和文件夹。内容会写入库根目录 .gitignore 的标记区间内，下次同步时生效。"
+				"One path per line, no trailing punctuation. Leave empty to ignore all dot-prefixed files and folders by default. The content is written inside a marked block in the vault's root .gitignore and takes effect on the next sync."
 			)
 			.addTextArea((text) => {
 				text
-					.setPlaceholder("例如：\n.cache/\n附件/")
+					.setPlaceholder("For example:\n.cache/\nattachments/")
 					.setValue(settings.ignoredPaths)
 					.onChange(async (value) => {
 						settings.ignoredPaths = value;
@@ -79,8 +126,8 @@ export class SilenceGitSyncSettingTab extends PluginSettingTab {
 		ignoreSetting.settingEl.addClass("silence-git-sync-ignore-input-container");
 
 		new Setting(containerEl)
-			.setName("编辑后同步延迟（分钟）")
-			.setDesc("停止编辑一段时间后自动同步一次。")
+			.setName("Sync delay after edit (minutes)")
+			.setDesc("Automatically sync once after you stop editing for this long.")
 			.addText((text) =>
 				text.setValue(String(settings.editDelayMinutes)).onChange(async (value) => {
 					settings.editDelayMinutes = Math.max(1, Number(value) || 1);
@@ -89,8 +136,8 @@ export class SilenceGitSyncSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("定时同步间隔（分钟）")
-			.setDesc("每隔该时间自动提交并推送一次。")
+			.setName("Scheduled sync interval (minutes)")
+			.setDesc("Automatically commit and push once every this many minutes.")
 			.addText((text) =>
 				text.setValue(String(settings.syncIntervalMinutes)).onChange(async (value) => {
 					settings.syncIntervalMinutes = Math.max(1, Number(value) || 1);
@@ -98,11 +145,11 @@ export class SilenceGitSyncSettingTab extends PluginSettingTab {
 				})
 			);
 
-		new Setting(containerEl).setName("立即同步").addButton((button) =>
+		new Setting(containerEl).setName("Sync now").addButton((button) =>
 			button
-				.setButtonText("立即执行")
+				.setButtonText("Sync now")
 				.setCta()
-				.onClick(() => this.plugin.sync("手动同步", true))
+				.onClick(() => this.plugin.sync("Manual sync", true))
 		);
 	}
 }

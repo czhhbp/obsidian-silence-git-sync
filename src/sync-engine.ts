@@ -1,12 +1,14 @@
 import * as fs from "fs";
 import * as path from "path";
+import { FileSystemAdapter } from "obsidian";
+import type { App } from "obsidian";
 import {
 	IGNORE_MARKER_END,
 	IGNORE_MARKER_START,
 	NO_ORIGIN_MESSAGE,
 	NOT_GIT_REPO_MESSAGE,
 } from "./constants";
-import { conflictCopyPath, runGit, SyncError, tokenEnv } from "./git";
+import { conflictCopyPath, runGit, runGitBuffer, SyncError, tokenEnv } from "./git";
 import type { SilenceGitSyncSettings } from "./settings";
 
 export interface SyncCallbacks {
@@ -20,18 +22,21 @@ export interface SyncCallbacks {
  * 冲突时把远程内容另存为 .sync-remote 副本，原文保留本地版本，随后提交双方。
  */
 export class GitSyncEngine {
-	// 由上层注入 app，避免引擎反向依赖 Obsidian 运行时类型。
-	private app: any;
+	private readonly app: App;
 
 	constructor(
-		app: any,
+		app: App,
 		private readonly settings: SilenceGitSyncSettings
 	) {
 		this.app = app;
 	}
 
 	private get vaultPath(): string {
-		return this.app.vault.adapter.getBasePath();
+		const adapter = this.app.vault.adapter;
+		if (adapter instanceof FileSystemAdapter) {
+			return adapter.getBasePath();
+		}
+		throw new Error("silence-git-sync 仅支持桌面端本地文件系统。");
 	}
 
 	/** 把设置里的忽略路径写入库根 .gitignore 的标记区间，便于幂等更新。 */
@@ -154,13 +159,11 @@ export class GitSyncEngine {
 		for (const file of names) {
 			const remoteCopy = conflictCopyPath(file);
 			try {
-				const remote = await runGit(this.vaultPath, ["show", `:3:${file}`], {
-					encoding: "buffer",
-				});
+				const remote = await runGitBuffer(this.vaultPath, ["show", `:3:${file}`]);
 				fs.mkdirSync(path.dirname(path.join(this.vaultPath, remoteCopy)), {
 					recursive: true,
 				});
-				fs.writeFileSync(path.join(this.vaultPath, remoteCopy), remote.stdout);
+				fs.writeFileSync(path.join(this.vaultPath, remoteCopy), remote);
 			} catch {
 				// 删除/修改类冲突没有可复制的远程对象，跳过即可。
 			}
@@ -220,7 +223,7 @@ export class GitSyncEngine {
 		await runGit(this.vaultPath, ["push", "origin", `HEAD:${branch}`], {
 			env: gitEnv,
 		});
-		onStatus("成功", "success");
-		if (isManual) onNotice("同步成功");
+		onStatus("Success", "success");
+		if (isManual) onNotice("Sync succeeded");
 	}
 }

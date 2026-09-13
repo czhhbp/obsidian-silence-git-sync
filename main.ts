@@ -14,12 +14,13 @@ export default class SilenceGitSync extends Plugin {
 	private statusBar!: HTMLElement;
 
 	async onload(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const stored = (await this.loadData()) as Partial<SilenceGitSyncSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
 		this.engine = new GitSyncEngine(this.app, this.settings);
 
 		this.statusBar = this.addStatusBarItem();
 		this.statusBar.addClass("silence-git-sync-status");
-		this.setStatus("尚未同步", "muted");
+		this.setStatus("Not yet synced", "muted");
 
 		this.supported = platformError() === null;
 
@@ -27,26 +28,23 @@ export default class SilenceGitSync extends Plugin {
 
 		if (!this.supported) {
 			// 移动端没有系统 Git：保持插件可加载，但不注册同步入口，避免产生无效操作。
-			this.setStatus("移动端不可用", "error");
+			this.setStatus("Unavailable on mobile", "error");
 			return;
 		}
 
-		this.addRibbonIcon("sync", "立即同步（Silence Git Sync）", () =>
-			this.sync("手动同步", true)
-		);
+		this.addRibbonIcon("sync", "Sync now", () => this.sync("Manual sync", true));
 
 		this.addCommand({
 			id: "sync-now",
-			name: "立即同步",
-			hotkeys: [{ modifiers: ["Ctrl", "Shift"], key: "S" }],
-			callback: () => this.sync("手动同步", true),
+			name: "Sync now",
+			callback: () => this.sync("Manual sync", true),
 		});
 
 		this.registerEvent(this.app.vault.on("modify", () => this.scheduleEditSync()));
 
 		this.syncInterval = window.setInterval(
 			() => {
-				void this.sync("定时同步");
+				void this.sync("Scheduled sync");
 			},
 			Math.max(1, this.settings.syncIntervalMinutes) * 60 * 1000
 		);
@@ -68,7 +66,7 @@ export default class SilenceGitSync extends Plugin {
 		if (this.syncInterval) window.clearInterval(this.syncInterval);
 		this.syncInterval = window.setInterval(
 			() => {
-				void this.sync("定时同步");
+				void this.sync("Scheduled sync");
 			},
 			Math.max(1, this.settings.syncIntervalMinutes) * 60 * 1000
 		);
@@ -76,7 +74,7 @@ export default class SilenceGitSync extends Plugin {
 	}
 
 	setStatus(message: string, state: "success" | "error" | "muted"): void {
-		this.statusBar.setText(`上次同步：${message}`);
+		this.statusBar.setText(`Last sync: ${message}`);
 		this.statusBar.dataset.state = state;
 	}
 
@@ -85,7 +83,7 @@ export default class SilenceGitSync extends Plugin {
 		this.pendingEditSync = window.setTimeout(
 			() => {
 				this.pendingEditSync = null;
-				void this.sync("编辑后同步");
+				void this.sync("Sync after edit");
 			},
 			Math.max(1, this.settings.editDelayMinutes) * 60 * 1000
 		);
@@ -96,13 +94,13 @@ export default class SilenceGitSync extends Plugin {
 
 		const unavailable = platformError();
 		if (unavailable) {
-			this.setStatus(`${formatTime(new Date())} 失败`, "error");
+			this.setStatus(`${formatTime(new Date())} failed`, "error");
 			if (manual) new Notice(unavailable.message);
 			return;
 		}
 
 		this.syncing = true;
-		if (manual) new Notice("开始同步");
+		if (manual) new Notice("Sync started");
 
 		try {
 			await this.engine.sync(reason, {
@@ -114,12 +112,12 @@ export default class SilenceGitSync extends Plugin {
 		} catch (error) {
 			console.error("Silence Git Sync", error);
 			const syncError = error as SyncError;
-			const message = (syncError.stderr || syncError.message || String(error))
-				.toString()
-				.trim();
-			this.setStatus(`${formatTime(new Date())} 失败`, "error");
+			const rawMessage =
+				syncError.stderr || syncError.message || String(error);
+			const message = rawMessage.trim();
+			this.setStatus(`${formatTime(new Date())} failed`, "error");
 			if (manual) {
-				new Notice(`同步失败：${message}`);
+				new Notice(`Sync failed: ${message}`);
 			} else if (syncError.gitMissing || syncError.platformUnsupported) {
 				// 后台同步默认静默，但“缺少系统 Git”“环境不支持”属于必须让用户知晓的配置问题。
 				new Notice(message, 10000);

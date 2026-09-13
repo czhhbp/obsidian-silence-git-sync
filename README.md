@@ -1,6 +1,6 @@
 # Silence Git Sync
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/czhhbp/silence-git-sync/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/czhhbp/obsidian-silence-git-sync/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 一个 Obsidian 插件：**用系统 Git 在后台静默同步笔记库**。改完笔记不用管，它自己提交、合并、推送；没有弹窗打扰，只在出错时告诉你。
@@ -23,7 +23,7 @@
 
 ### 手动安装
 
-1. 从 [Releases](https://github.com/czhhbp/silence-git-sync/releases) 下载 `main.js`、`manifest.json`、`styles.css`。
+1. 从 [Releases](https://github.com/czhhbp/obsidian-silence-git-sync/releases) 下载 `main.js`、`manifest.json`、`styles.css`。
 2. 放入 `<你的库>/.obsidian/plugins/silence-git-sync/` 目录。
 3. 在 Obsidian 的「设置 → 第三方插件」中启用 **Silence Git Sync**。
 
@@ -89,8 +89,8 @@ flowchart TD
 ## 开发
 
 ```bash
-git clone https://github.com/czhhbp/silence-git-sync.git
-cd silence-git-sync
+git clone https://github.com/czhhbp/obsidian-silence-git-sync.git
+cd obsidian-silence-git-sync
 npm install
 
 # 开发模式（监听并自动重建）

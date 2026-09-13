@@ -1,0 +1,30 @@
+/* Silence Git Sync —— 状态栏与设置面板样式 */
+
+.silence-git-sync-status {
+	font-variant-numeric: tabular-nums;
+}
+
+.silence-git-sync-status[data-state="success"] {
+	color: var(--text-success, #3fbf7f);
+}
+
+.silence-git-sync-status[data-state="error"] {
+	color: var(--text-error, #e5534b);
+}
+
+.silence-git-sync-status[data-state="muted"] {
+	color: var(--text-muted);
+}
+
+.silence-git-sync-ignore-input {
+	width: 100%;
+	font-family: var(--font-monospace);
+}
+
+.silence-git-sync-ignore-input-container {
+	display: block;
+}
+
+.silence-git-sync-ignore-input-container .setting-item-control {
+	width: 50%;
+}

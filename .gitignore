@@ -1,0 +1,12 @@
+# 依赖与构建中间产物
+node_modules/
+*.js.map
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 本地测试用的库数据
+data.json

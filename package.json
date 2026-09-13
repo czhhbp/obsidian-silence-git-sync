@@ -1,0 +1,27 @@
+{
+	"name": "silence-git-sync",
+	"version": "1.0.0",
+	"description": "静默后台同步 Obsidian 笔记库到 Git 远程仓库。Silently sync your Obsidian vault to a Git remote.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"git",
+		"sync",
+		"backup"
+	],
+	"author": "czhhbp",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^20.11.0",
+		"esbuild": "^0.20.0",
+		"obsidian": "latest",
+		"tslib": "^2.6.2",
+		"typescript": "^5.3.3"
+	}
+}

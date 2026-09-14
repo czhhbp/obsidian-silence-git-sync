@@ -1,6 +1,6 @@
 {
 	"name": "silence-git-sync",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Silently sync your Obsidian vault to a Git remote in the background.",
 	"main": "main.js",
 	"scripts": {

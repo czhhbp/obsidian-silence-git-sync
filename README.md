@@ -1,11 +1,11 @@
 # Silence Git Sync
 
-[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)](https://github.com/czhhbp/obsidian-silence-git-sync/releases)
+[![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)](https://github.com/czhhbp/obsidian-silence-git-sync/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Sync your vault to a Git remote silently in the background. Edit your notes and forget about it — the plugin commits, merges, and pushes on its own. No popups, no interruptions; you only hear from it when something goes wrong.
 
-> ⚠️ **Desktop only** (Windows / macOS / Linux). The mobile version of Obsidian runs in a sandboxed container where the system Git executable is unavailable, so this plugin disables syncing when loaded on mobile.
+> ⚠️ **Desktop only** (Windows / macOS / Linux). The mobile version of Obsidian runs in a sandboxed container where the system Git executable is unavailable, so this plugin disables syncing when loaded on mobile. See [Android](#android) for why, and for the Termux-based workaround.
 
 ## Features
 
@@ -33,6 +33,49 @@ Sync your vault to a Git remote silently in the background. Edit your notes and 
 - Your vault must either already be a Git repository, or you must provide a remote URL in the plugin settings.
 
 To verify: run `git --version` in your vault root — it should print a version number.
+
+## Android
+
+This plugin **does not run on Android**, even if you have installed Git through [Termux](https://termux.dev/) and it works perfectly inside a Termux shell. The reason is sandbox isolation, not a configuration switch:
+
+- Obsidian for Android runs inside a Capacitor/WebView container with **no Node.js runtime**. `require("child_process")` — the only way this plugin can spawn `git` — does not exist there.
+- The Git you installed in Termux lives in Termux's **private Linux user space** (e.g. `/data/data/com.termux/files/usr/bin/git`). Only processes started inside Termux can execute it.
+- Obsidian and Termux have separate UIDs, separate file-system views, and separate process trees. There is **no supported bridge** between them, so the plugin cannot call Termux's Git.
+
+Because of this, the plugin detects the platform at load time and disables syncing on mobile instead of failing to load. Ripping out that check would not make sync work — it would only make the plugin throw and break.
+
+### Workaround: sync from Termux, not from Obsidian
+
+If you want Git-based backup of your vault on Android, run Git **from Termux on a schedule** and treat the vault as an ordinary folder. Obsidian never needs to know about Git.
+
+1. Install [Termux](https://github.com/termux/termux-app/releases) and Git, and grant Termux access to shared storage:
+   ```bash
+   pkg update && pkg install git openssh cronie
+   termux-setup-storage   # approve the permission prompt
+   ```
+2. Point the vault path at your shared-storage copy. On modern Android the vault usually lives under:
+   ```bash
+   cd ~/storage/shared/<YourVaultFolder>
+   ```
+   > If Android's scoped storage blocks the path, keep a copy of the vault inside Termux's own home (`~/vault`) and sync that instead — or use Termux's `termux-setup-storage` shortcut folders.
+3. Initialise it as a repository and add your remote (use a token in the URL or an SSH key):
+   ```bash
+   git init
+   git remote add origin https://<TOKEN>@github.com/<user>/<repo>.git
+   git add -A && git commit -m "init"
+   git push -u origin main
+   ```
+4. Schedule a periodic commit-and-push with `cronie`:
+   ```bash
+   crontab -e
+   ```
+   Add a line such as (every 30 minutes):
+   ```cron
+   */30 * * * * cd ~/storage/shared/<YourVaultFolder> && git add -A && git commit -m "auto: $(date +\%F_\%T)" && git push origin main >> ~/sync.log 2>&1
+   ```
+   Start the daemon with `crond`, and keep Termux alive (disable battery optimisation for Termux, or use `termux-job-scheduler`).
+
+Keeping the vault inside a Git repository that Android also syncs elsewhere means `.obsidian/` workspace files churn frequently — add a sensible `.gitignore` in the vault root to keep the history clean.
 
 ## Settings
 
@@ -82,7 +125,7 @@ This way **neither side's content is ever lost**, and you can compare and merge 
 | Conflict handling | Keeps both sides; remote saved as a copy | Marks conflicts for the user to resolve |
 | Interface | Minimal settings, no extra views | Full source control view, history view, diff view |
 | Goal | Frictionless background backup | A complete Git client experience |
-| Mobile | Not supported (explicitly disabled) | Experimental (isomorphic-git, unstable) |
+| Mobile | Not supported — sandbox has no Git access (see [Android](#android)) | Experimental (isomorphic-git, unstable) |
 
 Do **not** enable both at once — they would operate on the same repository concurrently and can cause conflicts or index corruption.
 

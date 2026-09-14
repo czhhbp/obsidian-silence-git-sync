@@ -36,7 +36,9 @@ export class GitSyncEngine {
 		if (adapter instanceof FileSystemAdapter) {
 			return adapter.getBasePath();
 		}
-		throw new Error("silence-git-sync 仅支持桌面端本地文件系统。");
+		throw new Error(
+			"silence-git-sync only supports a local file system on desktop."
+		);
 	}
 
 	/** 把设置里的忽略路径写入库根 .gitignore 的标记区间，便于幂等更新。 */
